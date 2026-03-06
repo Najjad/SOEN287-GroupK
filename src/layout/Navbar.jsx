@@ -38,9 +38,6 @@ export default function Navbar() {
 
         {user && (
           <>
-            <Link to="/edit-account" style={buttonStyle}>
-              Edit Account
-            </Link>
             <button onClick={handleLogout} style={buttonStyle}>
               Logout
             </button>
