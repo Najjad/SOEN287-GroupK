@@ -5,23 +5,56 @@ export const AuthContext = createContext();
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
 
-  const login = (email, password) => {
-    if (email === "student@test.com" && password === "1234") {
-      setUser({ role: "student", email });
+  const login = async (email, password) => {
+    try {
+      const res = await fetch("http://localhost:5000/api/users/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password })
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) return false;
+
+      setUser({ email: data.email, role: data.role, userId: data.userId });
+      localStorage.setItem("user", JSON.stringify(data));
+
       return true;
+
+    } catch (err) {
+      console.error(err);
+      return false;
     }
-    if (email === "admin@test.com" && password === "1234") {
-      setUser({ role: "admin", email });
-      return true;
-    }
-    return false;
   };
 
-  const register = (data) => {
-    setUser({ role: data.role, email: data.email });
+  const register = async (userData) => {
+    try {
+      const res = await fetch("http://localhost:5000/api/users/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(userData)
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) return false;
+
+      setUser({ email: data.email || userData.email, role: data.role || userData.role, userId: data.userId });
+      localStorage.setItem("user", JSON.stringify(data));
+
+      return true;
+
+    } catch (err) {
+      console.error(err);
+      return false;
+    }
   };
 
-  const logout = () => setUser(null);
+  const logout = () => {
+    setUser(null);
+    localStorage.removeItem("user");
+  };
 
   return (
     <AuthContext.Provider value={{ user, login, register, logout }}>

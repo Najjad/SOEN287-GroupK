@@ -3,6 +3,7 @@ import { AuthContext } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
 
 function Login() {
+
   const { login } = useContext(AuthContext);
   const navigate = useNavigate();
 
@@ -10,19 +11,38 @@ function Login() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
 
-  const handleSubmit = (e) => {
+  // FIXED: async login handling
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
+    // Clear old error
+    setError("");
+
+    // Validation
     if (!email || !password) {
       setError("All fields are required");
       return;
     }
 
-    const success = login(email, password);
-    if (!success) {
-      setError("Invalid credentials");
-    } else {
+    try {
+
+      // Call backend login
+      const success = await login(email, password);
+
+      if (!success) {
+        setError("Invalid credentials");
+        return;
+      }
+
+      // Redirect on success
       navigate("/dashboard");
+
+    } catch (err) {
+
+      console.error("Login error:", err);
+
+      setError("Server error. Try again.");
+
     }
   };
 
