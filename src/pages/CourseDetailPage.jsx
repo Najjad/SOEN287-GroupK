@@ -1,181 +1,312 @@
-import { useParams, useNavigate } from 'react-router-dom'
-import { mockCourseDetails } from '../utils/mockData'
-import GradeTable from '../components/GradeTable'
-import ProgressBar from '../components/ProgressBar'
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
-import { useState } from 'react'
-import Modal from '../components/Modal'
+import { useContext, useEffect, useMemo, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
+import { AuthContext } from "../context/AuthContext";
+import {
+  deleteUserCourse,
+  fetchUserCourse,
+  updateUserCourse,
+} from "../api/users";
+import CourseFormModal from "../components/CourseFormModal";
+import GradeTable from "../components/GradeTable";
+import Modal from "../components/Modal";
+import ProgressBar from "../components/ProgressBar";
+import { formatAverage, getDaysLabel } from "../utils/courseHelpers";
 
 function CourseDetailPage() {
-  const { courseId } = useParams()
-  const navigate = useNavigate()
-  const [showDelete, setShowDelete] = useState(false)
-  
-  const course = mockCourseDetails[courseId] || mockCourseDetails['1']
+  const { user } = useContext(AuthContext);
+  const { courseId } = useParams();
+  const navigate = useNavigate();
 
-  // Calculate category averages
-  const categoryData = course.assessmentCategories.map(cat => {
-    const catAssessments = course.assessments.filter(a => a.category === cat.name && a.earnedMarks !== null)
-    const avg = catAssessments.length > 0
-      ? catAssessments.reduce((sum, a) => sum + ((a.earnedMarks / a.totalMarks) * 100), 0) / catAssessments.length
-      : 0
-    return {
-      name: cat.name.substring(0, 10),
-      fullName: cat.name,
-      average: parseFloat(avg.toFixed(1)),
-      weight: cat.weight * 100
+  const [course, setCourse] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [showDelete, setShowDelete] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [successMessage, setSuccessMessage] = useState("");
+
+  useEffect(() => {
+    async function loadCourse() {
+      if (!user?.userId) {
+        setIsLoading(false);
+        return;
+      }
+
+      try {
+        setIsLoading(true);
+        setError("");
+        const response = await fetchUserCourse(user.userId, courseId);
+        setCourse(response.course);
+      } catch (err) {
+        setError(err.message || "Unable to load course");
+      } finally {
+        setIsLoading(false);
+      }
     }
-  })
 
-  const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6']
+    loadCourse();
+  }, [courseId, user?.userId]);
 
-  // Grade distribution
-  const gradeDistribution = [
-    { name: 'A (90-100%)', value: course.assessments.filter(a => a.earnedMarks && (a.earnedMarks/a.totalMarks)*100 >= 90).length },
-    { name: 'B (80-89%)', value: course.assessments.filter(a => a.earnedMarks && (a.earnedMarks/a.totalMarks)*100 >= 80 && (a.earnedMarks/a.totalMarks)*100 < 90).length },
-    { name: 'C (70-79%)', value: course.assessments.filter(a => a.earnedMarks && (a.earnedMarks/a.totalMarks)*100 >= 70 && (a.earnedMarks/a.totalMarks)*100 < 80).length },
-    { name: 'D (60-69%)', value: course.assessments.filter(a => a.earnedMarks && (a.earnedMarks/a.totalMarks)*100 >= 60 && (a.earnedMarks/a.totalMarks)*100 < 70).length },
-  ].filter(item => item.value > 0)
+  const categoryData = useMemo(() => {
+    if (!course?.assessments) {
+      return [];
+    }
 
-  const handleDelete = () => {
-    alert(`✓ ${course.code} has been removed from your courses`)
-    navigate('/student/courses')
+    const grouped = course.assessments.reduce((accumulator, assessment) => {
+      if (!accumulator[assessment.category]) {
+        accumulator[assessment.category] = [];
+      }
+      accumulator[assessment.category].push(assessment);
+      return accumulator;
+    }, {});
+
+    return Object.entries(grouped).map(([category, assessments]) => {
+      const graded = assessments.filter(
+        (assessment) => assessment.earnedMarks !== null && Number(assessment.totalMarks) > 0
+      );
+
+      const average = graded.length
+        ? graded.reduce((sum, assessment) => {
+            return sum + (Number(assessment.earnedMarks) / Number(assessment.totalMarks)) * 100;
+          }, 0) / graded.length
+        : 0;
+
+      return {
+        name: category,
+        average: Number(average.toFixed(1)),
+      };
+    });
+  }, [course]);
+
+  const upcomingAssessments = useMemo(
+    () => (course?.assessments || []).filter((assessment) => assessment.status !== "completed"),
+    [course]
+  );
+
+  const handleDelete = async () => {
+    try {
+      await deleteUserCourse(user.userId, course.id);
+      navigate("/courses");
+    } catch (err) {
+      setError(err.message || "Unable to delete course");
+    }
+  };
+
+  const handleUpdateCourse = async (form) => {
+    try {
+      setIsSaving(true);
+      setError("");
+      const response = await updateUserCourse(user.userId, course.id, form);
+      setCourse((current) => ({
+        ...current,
+        ...response.course,
+      }));
+      setSuccessMessage(`${form.code.toUpperCase()} was updated successfully.`);
+      setShowEditModal(false);
+    } catch (err) {
+      setError(err.message || "Unable to update course");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  if (!user) {
+    return <div className="card">Please log in to view this course.</div>;
+  }
+
+  if (isLoading) {
+    return <div className="card">Loading course...</div>;
+  }
+
+  if (!course) {
+    return <div className="card">Course not found.</div>;
   }
 
   return (
-    <div>
-      {/* Header */}
-      <div className="mb-8 flex justify-between items-start">
+    <div className="student-page">
+      {successMessage ? <div className="alert-box success-alert">{successMessage}</div> : null}
+      {error ? <div className="alert-box error-alert">{error}</div> : null}
+
+      <div className="page-header">
         <div>
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">{course.code}</h1>
-          <h2 className="text-2xl text-gray-600 mb-4">{course.name}</h2>
-          <div className="grid grid-cols-2 gap-4 text-sm text-gray-600">
-            <p>👨‍🏫 <span className="font-semibold">{course.instructor}</span></p>
-            <p>📍 <span className="font-semibold">{course.room}</span></p>
-            <p>📅 <span className="font-semibold">{course.schedule}</span></p>
-            <p>🎓 <span className="font-semibold">{course.credits} Credits</span></p>
+          <p className="eyebrow">Course Page</p>
+          <h1 className="page-title">{course.code}</h1>
+          <p className="page-subtitle">{course.name}</p>
+          <div className="detail-meta">
+            <span>Instructor: {course.instructor}</span>
+            <span>Term: {course.term}</span>
+            <span>Room: {course.room || "TBA"}</span>
+            <span>Schedule: {course.schedule || "TBA"}</span>
           </div>
         </div>
-        <div className="space-y-2">
-          <button className="btn-secondary w-32">Edit Course</button>
-          <button onClick={() => setShowDelete(true)} className="btn-danger w-32">
+        <div className="stack-actions">
+          <button className="btn-secondary" onClick={() => setShowEditModal(true)}>
+            Edit Course
+          </button>
+          <button className="btn-danger" onClick={() => setShowDelete(true)}>
             Remove Course
           </button>
         </div>
       </div>
 
-      {/* Main Grade Display */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
-        {/* Left: Course Average & Description */}
-        <div className="lg:col-span-2 card">
-          <div className="mb-6">
-            <h3 className="text-lg font-semibold text-gray-700 mb-2">Course Average</h3>
-            <div className="flex items-center gap-4 mb-4">
-              <div className="text-5xl font-bold text-blue-600">{course.average}%</div>
-              <div className="flex-1">
-                <ProgressBar percentage={course.average} size="lg" />
-              </div>
+      <div className="detail-grid">
+        <div className="card">
+          <div className="section-heading">
+            <div>
+              <h2>Current Average</h2>
+              <p>Calculated from completed assessments</p>
             </div>
-            <p className="text-sm text-gray-600">Based on {course.assessments.filter(a => a.earnedMarks !== null).length} completed assessments</p>
           </div>
-
-          <div className="border-t pt-6">
-            <h3 className="font-semibold text-gray-900 mb-2">Course Description</h3>
-            <p className="text-gray-600">{course.description}</p>
+          <div className="average-hero">
+            <div className="average-number">{formatAverage(course.average)}</div>
+            <div className="average-progress">
+              <ProgressBar percentage={course.average} size="lg" />
+              <p className="supporting-text">
+                {course.completedAssessments} of {course.assessmentsCount} assessments graded
+              </p>
+            </div>
+          </div>
+          <div className="description-block">
+            <h3>Course Description</h3>
+            <p>{course.description || "Course details will appear here once configured."}</p>
           </div>
         </div>
 
-        {/* Right: Category Weights */}
         <div className="card">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Assessment Weights</h3>
-          <div className="space-y-3">
-            {course.assessmentCategories.map((cat) => (
-              <div key={cat.name}>
-                <div className="flex justify-between mb-1">
-                  <span className="text-sm font-medium text-gray-700">{cat.name}</span>
-                  <span className="text-sm font-bold text-gray-900">{(cat.weight * 100).toFixed(0)}%</span>
-                </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
-                  <div
-                    className="bg-blue-600 h-2 rounded-full"
-                    style={{ width: `${cat.weight * 100}%` }}
-                  ></div>
-                </div>
-              </div>
-            ))}
+          <div className="section-heading">
+            <div>
+              <h2>Progress</h2>
+              <p>Completion across all assessments</p>
+            </div>
+          </div>
+          <ProgressBar percentage={course.progress} label="Assessment Completion" />
+          <div className="mini-metrics">
+            <div>
+              <span className="mini-label">Assessments</span>
+              <strong>{course.assessmentsCount}</strong>
+            </div>
+            <div>
+              <span className="mini-label">Completed</span>
+              <strong>{course.completedAssessments}</strong>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Charts Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-        {/* Category Performance */}
+      <div className="detail-grid">
         <div className="card">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Performance by Category</h3>
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={categoryData}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="name" />
-              <YAxis domain={[0, 100]} />
-              <Tooltip formatter={(value) => `${value.toFixed(1)}%`} />
-              <Bar dataKey="average" fill="#3b82f6" name="Average %" />
-            </BarChart>
-          </ResponsiveContainer>
+          <div className="section-heading">
+            <div>
+              <h2>Upcoming Assessments</h2>
+              <p>Pending work for this course</p>
+            </div>
+          </div>
+
+          {upcomingAssessments.length === 0 ? (
+            <div className="empty-state">
+              <p>No upcoming assessments for this course.</p>
+              <p className="summary-helper">This course is fully caught up right now.</p>
+            </div>
+          ) : (
+            <div className="upcoming-list">
+              {upcomingAssessments.map((assessment) => (
+                <div key={assessment.id} className="upcoming-item static-item">
+                  <div>
+                    <p className="item-title">{assessment.title}</p>
+                    <p className="item-meta">
+                      {assessment.category} • Weight {assessment.weight}%
+                    </p>
+                  </div>
+                  <div className="item-badge-group">
+                    <span className={`status-chip ${assessment.status}`}>
+                      {getDaysLabel(assessment.daysLeft)}
+                    </span>
+                    <span className="item-date">{assessment.dueDate}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
-        {/* Grade Distribution */}
-        {gradeDistribution.length > 0 && (
-          <div className="card">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Your Grade Distribution</h3>
-            <ResponsiveContainer width="100%" height={300}>
-              <PieChart>
-                <Pie
-                  data={gradeDistribution}
-                  cx="50%"
-                  cy="50%"
-                  labelLine={false}
-                  label={({ name, value }) => `${name} (${value})`}
-                  outerRadius={80}
-                  fill="#8884d8"
-                  dataKey="value"
-                >
-                  {gradeDistribution.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip />
-              </PieChart>
-            </ResponsiveContainer>
+        <div className="card">
+          <div className="section-heading">
+            <div>
+              <h2>Category Performance</h2>
+              <p>Current average by assessment category</p>
+            </div>
           </div>
-        )}
+
+          {categoryData.length === 0 ? (
+            <div className="empty-state">
+              <p>No graded work yet.</p>
+            </div>
+          ) : (
+            <div style={{ width: "100%", height: 280 }}>
+              <ResponsiveContainer>
+                <BarChart data={categoryData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="name" />
+                  <YAxis domain={[0, 100]} />
+                  <Tooltip formatter={(value) => `${value}%`} />
+                  <Bar dataKey="average" fill="#4f46e5" radius={[8, 8, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* Assessments Table */}
       <div className="card">
-        <h2 className="text-2xl font-bold text-gray-900 mb-6">Assessments</h2>
-        <GradeTable assessments={course.assessments} />
+        <div className="section-heading">
+          <div>
+            <h2>Assessments</h2>
+            <p>Everything currently stored under this course</p>
+          </div>
+        </div>
+        <GradeTable assessments={course.assessments || []} />
       </div>
 
-      {/* Delete Confirmation Modal */}
-      <Modal
-        isOpen={showDelete}
-        onClose={() => setShowDelete(false)}
-        title="Remove Course"
-      >
-        <p className="text-gray-600 mb-6">
-          Are you sure you want to remove <strong>{course.code}</strong> from your courses? This action cannot be undone.
+      <Modal isOpen={showDelete} onClose={() => setShowDelete(false)} title="Remove Course">
+        <p className="modal-copy">
+          Remove <strong>{course.code}</strong> from your courses? This also removes its stored assessments.
         </p>
-        <div className="flex gap-3">
-          <button onClick={handleDelete} className="btn-danger flex-1">
+        <div className="modal-actions">
+          <button onClick={handleDelete} className="btn-danger">
             Yes, Remove Course
           </button>
-          <button onClick={() => setShowDelete(false)} className="btn-secondary flex-1">
+          <button onClick={() => setShowDelete(false)} className="btn-secondary">
             Cancel
           </button>
         </div>
       </Modal>
+
+      <CourseFormModal
+        isOpen={showEditModal}
+        onClose={() => setShowEditModal(false)}
+        onSubmit={handleUpdateCourse}
+        initialValues={{
+          code: course.code,
+          name: course.name,
+          instructor: course.instructor,
+          term: course.term,
+        }}
+        title="Edit Course"
+        submitLabel="Save Changes"
+        isSubmitting={isSaving}
+        error={error}
+      />
     </div>
-  )
+  );
 }
 
-export default CourseDetailPage
+export default CourseDetailPage;

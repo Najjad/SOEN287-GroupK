@@ -1,232 +1,205 @@
-import { useContext, useMemo, useState } from "react";
+import { useContext, useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { AuthContext } from "../context/AuthContext";
 import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  BarElement,
-  Tooltip,
-  Legend,
-} from "chart.js";
-import { Bar } from "react-chartjs-2";
-
-ChartJS.register(CategoryScale, LinearScale, BarElement, Tooltip, Legend);
-
-function daysUntil(dateStr) {
-  const today = new Date();
-  const due = new Date(dateStr);
-  const diff = due - today;
-  return Math.ceil(diff / (1000 * 60 * 60 * 24));
-}
+  createUserCourse,
+  fetchUserDashboard,
+} from "../api/users";
+import CourseCard from "../components/CourseCard";
+import CourseFormModal from "../components/CourseFormModal";
+import { formatAverage, getDaysLabel } from "../utils/courseHelpers";
 
 export default function Dashboard() {
   const { user } = useContext(AuthContext);
+  const navigate = useNavigate();
 
-  // ----- Demo Course Data -----
-  const [courses] = useState([
-    {
-      id: "1",
-      code: "SOEN 287",
-      average: 92,
-      remainingWeight: 50,
-      upcoming: [
-        { name: "Final Exam", dueDate: "2026-04-10", weight: 40 },
-      ],
+  const [dashboardData, setDashboardData] = useState({
+    overview: {
+      courseCount: 0,
+      overallAverage: 0,
+      upcomingCount: 0,
+      completedCount: 0,
     },
-    {
-      id: "2",
-      code: "COMP 249",
-      average: 80,
-      remainingWeight: 50,
-      upcoming: [
-        { name: "Project 2", dueDate: "2026-03-20", weight: 20 },
-      ],
-    },
-  ]);
+    courses: [],
+    upcomingAssessments: [],
+  });
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [formError, setFormError] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
 
-  const [target, setTarget] = useState("");
+  const nextDue = useMemo(
+    () => dashboardData.upcomingAssessments[0] || null,
+    [dashboardData.upcomingAssessments]
+  );
 
-  // ----- Computed Metrics -----
-  const computed = useMemo(() => {
-    const totalCourses = courses.length;
+  useEffect(() => {
+    async function loadDashboard() {
+      if (!user?.userId) {
+        setIsLoading(false);
+        return;
+      }
 
-    const overallAvg =
-      totalCourses > 0
-        ? courses.reduce((sum, c) => sum + c.average, 0) / totalCourses
-        : null;
+      try {
+        setIsLoading(true);
+        setError("");
+        const response = await fetchUserDashboard(user.userId);
+        setDashboardData(response);
+      } catch (err) {
+        setError(err.message || "Unable to load dashboard");
+      } finally {
+        setIsLoading(false);
+      }
+    }
 
-    const upcomingAll = courses
-      .flatMap((c) =>
-        c.upcoming.map((u) => ({
-          ...u,
-          course: c.code,
-          daysLeft: daysUntil(u.dueDate),
-        }))
-      )
-      .sort((a, b) => a.daysLeft - b.daysLeft);
+    loadDashboard();
+  }, [user?.userId]);
 
-    const atRisk = courses.filter((c) => c.average < 60);
-
-    return {
-      totalCourses,
-      overallAvg,
-      upcomingAll,
-      atRisk,
-    };
-  }, [courses]);
-
-  // ----- Goal Calculation -----
-  const requiredRemaining = useMemo(() => {
-    if (!target) return null;
-    const t = Number(target);
-    if (!Number.isFinite(t)) return null;
-
-    // assume average of all courses for demo
-    const remainingWeight =
-      courses.reduce((sum, c) => sum + c.remainingWeight, 0) /
-      courses.length;
-
-    const currentAvg =
-      courses.reduce((sum, c) => sum + c.average, 0) /
-      courses.length;
-
-    if (remainingWeight <= 0) return null;
-
-    const required =
-      (t - currentAvg) / (remainingWeight / 100);
-
-    return required;
-  }, [target, courses]);
-
-  // ----- Chart Data -----
-  const barData = {
-    labels: courses.map((c) => c.code),
-    datasets: [
-      {
-        label: "Course Average (%)",
-        data: courses.map((c) => c.average),
-      },
-    ],
+  const handleCreateCourse = async (form) => {
+    try {
+      setIsSaving(true);
+      setFormError("");
+      await createUserCourse(user.userId, form);
+      const response = await fetchUserDashboard(user.userId);
+      setDashboardData(response);
+      setShowAddModal(false);
+      setSuccessMessage(`${form.code.toUpperCase()} was added to your course list.`);
+    } catch (err) {
+      setFormError(err.message || "Unable to save course");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   if (!user) {
-      return <div>Please log in to view your dashboard.</div>;
-    }
-
+    return <div className="card">Please log in to view your dashboard.</div>;
+  }
 
   return (
-    <div style={{ maxWidth: 1200, margin: "0 auto", padding: 30 }}>
-      <h1>Dashboard</h1>
-      <p style={{ color: "#666" }}>
-        Welcome {user?.email} ({user?.role})
-      </p>
-
-      {/* ===== Stats Row ===== */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 20, marginTop: 20 }}>
-        <StatCard title="Total Courses" value={computed.totalCourses} />
-        <StatCard
-          title="Overall Average"
-          value={
-            computed.overallAvg === null
-              ? "—"
-              : `${computed.overallAvg.toFixed(1)}%`
-          }
-        />
-        <StatCard
-          title="Upcoming Deadlines"
-          value={computed.upcomingAll.length}
-        />
-        <StatCard
-          title="At Risk"
-          value={computed.atRisk.length}
-          danger={computed.atRisk.length > 0}
-        />
+    <div className="student-page">
+      <div className="page-header">
+        <div>
+          <p className="eyebrow">Student Dashboard</p>
+          <h1 className="page-title">Welcome back.</h1>
+          <p className="page-subtitle">
+            Review your enrolled courses, upcoming assessments, and quick progress summaries.
+          </p>
+        </div>
+        <button className="btn-primary" onClick={() => setShowAddModal(true)}>
+          Add Course
+        </button>
       </div>
 
-      {/* ===== Middle Section ===== */}
-      <div style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr", gap: 20, marginTop: 30 }}>
+      {successMessage ? <div className="alert-box success-alert">{successMessage}</div> : null}
+      {error ? <div className="alert-box error-alert">{error}</div> : null}
 
-        {/* Upcoming Timeline */}
-        <div style={{ padding: 20, border: "1px solid #ddd", borderRadius: 12 }}>
-          <h2>Upcoming Deadlines</h2>
+      {isLoading ? (
+        <div className="card">Loading dashboard...</div>
+      ) : (
+        <>
+          <section className="stats-grid">
+            <StatCard title="Enrolled Courses" value={dashboardData.overview.courseCount} />
+            <StatCard title="Overall Average" value={formatAverage(dashboardData.overview.overallAverage)} />
+            <StatCard title="Upcoming Assessments" value={dashboardData.overview.upcomingCount} />
+            <StatCard
+              title="Next Deadline"
+              value={nextDue ? nextDue.dueDate : "None"}
+              helper={nextDue ? `${nextDue.title} • ${nextDue.courseCode}` : "No pending work"}
+            />
+          </section>
 
-          {computed.upcomingAll.length === 0 ? (
-            <p>No upcoming assessments.</p>
-          ) : (
-            computed.upcomingAll.slice(0, 5).map((u, i) => (
-              <div key={i} style={{ marginBottom: 10 }}>
-                <strong>{u.name}</strong> — {u.course}
-                <div style={{ fontSize: 14, color: u.daysLeft < 0 ? "red" : "#555" }}>
-                  {u.daysLeft < 0
-                    ? `Overdue by ${Math.abs(u.daysLeft)} days`
-                    : `Due in ${u.daysLeft} days`}
+          <section className="dashboard-two-column">
+            <div className="card">
+              <div className="section-heading">
+                <div>
+                  <h2>Course Overview</h2>
+                  <p>{dashboardData.courses.length} courses currently saved for you.</p>
                 </div>
               </div>
-            ))
-          )}
-        </div>
 
-        {/* Course Performance Chart */}
-        <div style={{ padding: 20, border: "1px solid #ddd", borderRadius: 12 }}>
-          <h2>Performance Overview</h2>
-          <div style={{ height: 300 }}>
-            <Bar data={barData} />
-          </div>
-        </div>
-      </div>
+              {dashboardData.courses.length === 0 ? (
+                <div className="empty-state">
+                  <p>No courses yet. Add one to start building your dashboard.</p>
+                </div>
+              ) : (
+                <div className="course-grid">
+                  {dashboardData.courses.map((course) => (
+                    <CourseCard
+                      key={course.id}
+                      course={course}
+                      onClick={() => navigate(`/courses/${course.id}`)}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
 
-      {/* ===== Goal Section ===== */}
-      <div style={{ padding: 20, border: "1px solid #ddd", borderRadius: 12, marginTop: 30 }}>
-        <h2>Grade Goal Planner</h2>
-        <p>Enter a target overall average to estimate required performance.</p>
+            <div className="card">
+              <div className="section-heading">
+                <div>
+                  <h2>Upcoming Assessments</h2>
+                  <p>Across all courses</p>
+                </div>
+              </div>
 
-        <input
-          placeholder="Target % (e.g., 85)"
-          value={target}
-          onChange={(e) => setTarget(e.target.value)}
-          style={{ padding: 8, marginRight: 10 }}
-        />
-
-        {requiredRemaining !== null && (
-          <p style={{ marginTop: 10 }}>
-            Required average on remaining assessments:{" "}
-            <strong>
-              {requiredRemaining > 100
-                ? "Unrealistic target"
-                : `${requiredRemaining.toFixed(1)}%`}
-            </strong>
-          </p>
-        )}
-      </div>
-
-      {/* ===== Risk Alerts ===== */}
-      {computed.atRisk.length > 0 && (
-        <div style={{ marginTop: 30, padding: 20, border: "1px solid #e74c3c", borderRadius: 12, background: "#ffecec" }}>
-          <h3>⚠ Academic Risk Alert</h3>
-          {computed.atRisk.map((c) => (
-            <p key={c.id}>
-              {c.code} average is {c.average}%
-            </p>
-          ))}
-        </div>
+              {dashboardData.upcomingAssessments.length === 0 ? (
+                <div className="empty-state">
+                  <p>No upcoming assessments right now.</p>
+                  <p className="summary-helper">Each new course now comes with starter assessment data so this section stays useful.</p>
+                </div>
+              ) : (
+                <div className="upcoming-list">
+                  {dashboardData.upcomingAssessments.slice(0, 6).map((assessment) => (
+                    <button
+                      key={assessment.id}
+                      className="upcoming-item"
+                      onClick={() => navigate(`/courses/${assessment.courseId}`)}
+                    >
+                      <div>
+                        <p className="item-title">{assessment.title}</p>
+                        <p className="item-meta">
+                          {assessment.courseCode} • {assessment.category}
+                        </p>
+                      </div>
+                      <div className="item-badge-group">
+                        <span className={`status-chip ${assessment.status}`}>
+                          {getDaysLabel(assessment.daysLeft)}
+                        </span>
+                        <span className="item-date">{assessment.dueDate}</span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </section>
+        </>
       )}
+
+      <CourseFormModal
+        isOpen={showAddModal}
+        onClose={() => {
+          setShowAddModal(false);
+          setFormError("");
+        }}
+        onSubmit={handleCreateCourse}
+        title="Add Course"
+        submitLabel="Save Course"
+        isSubmitting={isSaving}
+        error={formError}
+      />
     </div>
   );
-  
 }
 
-function StatCard({ title, value, danger }) {
+function StatCard({ title, value, helper = "" }) {
   return (
-    <div
-      style={{
-        padding: 20,
-        borderRadius: 12,
-        border: "1px solid #ddd",
-        background: danger ? "#ffecec" : "white",
-      }}
-    >
-      <div style={{ fontSize: 14, color: "#666" }}>{title}</div>
-      <div style={{ fontSize: 28, fontWeight: 700 }}>{value}</div>
+    <div className="summary-card">
+      <p className="summary-label">{title}</p>
+      <div className="summary-value">{value}</div>
+      {helper ? <p className="summary-helper">{helper}</p> : null}
     </div>
   );
 }

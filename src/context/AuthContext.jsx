@@ -1,13 +1,26 @@
-import { createContext, useState } from "react";
+import { createContext, useEffect, useState } from "react";
 
 export const AuthContext = createContext();
 
+const API_BASE = "http://127.0.0.1:5000/api/users";
+
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState(() => {
+    const storedUser = localStorage.getItem("user");
+    return storedUser ? JSON.parse(storedUser) : null;
+  });
+
+  useEffect(() => {
+    if (user) {
+      localStorage.setItem("user", JSON.stringify(user));
+    } else {
+      localStorage.removeItem("user");
+    }
+  }, [user]);
 
   const login = async (email, password) => {
     try {
-      const res = await fetch("http://localhost:5000/api/users/login", {
+      const res = await fetch(`${API_BASE}/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password })
@@ -15,22 +28,23 @@ export function AuthProvider({ children }) {
 
       const data = await res.json();
 
-      if (!res.ok) return false;
+      if (!res.ok) {
+        throw new Error(data.error || "Login failed");
+      }
 
-      setUser({ email: data.email, role: data.role, userId: data.userId });
-      localStorage.setItem("user", JSON.stringify(data));
-
-      return true;
+      const nextUser = { email: data.email, role: data.role, userId: String(data.userId) };
+      setUser(nextUser);
+      return nextUser;
 
     } catch (err) {
       console.error(err);
-      return false;
+      throw err;
     }
   };
 
   const register = async (userData) => {
     try {
-      const res = await fetch("http://localhost:5000/api/users/register", {
+      const res = await fetch(`${API_BASE}/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(userData)
@@ -38,22 +52,27 @@ export function AuthProvider({ children }) {
 
       const data = await res.json();
 
-      if (!res.ok) return false;
+      if (!res.ok) {
+        throw new Error(data.error || "Registration failed");
+      }
 
-      setUser({ email: data.email || userData.email, role: data.role || userData.role, userId: data.userId });
-      localStorage.setItem("user", JSON.stringify(data));
+      const nextUser = {
+        email: data.email || userData.email,
+        role: data.role || userData.role,
+        userId: String(data.userId),
+      };
 
-      return true;
+      setUser(nextUser);
+      return nextUser;
 
     } catch (err) {
       console.error(err);
-      return false;
+      throw err;
     }
   };
 
   const logout = () => {
     setUser(null);
-    localStorage.removeItem("user");
   };
 
   return (

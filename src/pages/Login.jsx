@@ -10,6 +10,7 @@ function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // FIXED: async login handling
   const handleSubmit = async (e) => {
@@ -27,21 +28,20 @@ function Login() {
     try {
 
       // Call backend login
-      const success = await login(email, password);
-
-      if (!success) {
-        setError("Invalid credentials");
-        return;
-      }
+      setIsSubmitting(true);
+      const loggedInUser = await login(email, password);
 
       // Redirect on success
-      navigate("/dashboard");
+      navigate(loggedInUser.role === "admin" ? "/admin" : "/dashboard");
 
     } catch (err) {
 
       console.error("Login error:", err);
 
-      setError("Server error. Try again.");
+      setError(err.message || "Server error. Try again.");
+
+    } finally {
+      setIsSubmitting(false);
 
     }
   };
@@ -67,7 +67,9 @@ function Login() {
 
         {error && <p className="error">{error}</p>}
 
-        <button type="submit">Login</button>
+        <button type="submit" disabled={isSubmitting}>
+          {isSubmitting ? "Signing In..." : "Login"}
+        </button>
       </form>
 
       <p>Test accounts:</p>

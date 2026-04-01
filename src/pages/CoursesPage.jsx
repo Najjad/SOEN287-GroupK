@@ -1,159 +1,195 @@
-import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { mockStudentCourses } from '../utils/mockData'
-import CourseCard from '../components/CourseCard'
-import Modal from '../components/Modal'
+import { useContext, useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { AuthContext } from "../context/AuthContext";
+import {
+  createUserCourse,
+  deleteUserCourse,
+  fetchUserCourses,
+  updateUserCourse,
+} from "../api/users";
+import CourseCard from "../components/CourseCard";
+import CourseFormModal from "../components/CourseFormModal";
 
 function CoursesPage() {
-  const navigate = useNavigate()
-  const [showAddModal, setShowAddModal] = useState(false)
-  const [searchTerm, setSearchTerm] = useState('')
-  const [newCourse, setNewCourse] = useState({
-    code: '',
-    name: '',
-    instructor: '',
-    term: ''
-  })
+  const { user } = useContext(AuthContext);
+  const navigate = useNavigate();
 
-  const filteredCourses = mockStudentCourses.filter(course =>
-    course.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    course.name.toLowerCase().includes(searchTerm.toLowerCase())
-  )
+  const [courses, setCourses] = useState([]);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [showCourseModal, setShowCourseModal] = useState(false);
+  const [selectedCourse, setSelectedCourse] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
 
-  const handleAddCourse = () => {
-    if (newCourse.code && newCourse.name) {
-      // In Phase 2, this will call the backend API
-      alert(`✓ Successfully added ${newCourse.code}: ${newCourse.name}`)
-      setShowAddModal(false)
-      setNewCourse({ code: '', name: '', instructor: '', term: '' })
-    } else {
-      alert('Please fill in all required fields')
+  const filteredCourses = useMemo(
+    () =>
+      courses.filter(
+        (course) =>
+          course.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          course.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          course.instructor.toLowerCase().includes(searchTerm.toLowerCase())
+      ),
+    [courses, searchTerm]
+  );
+
+  useEffect(() => {
+    async function loadCourses() {
+      if (!user?.userId) {
+        setIsLoading(false);
+        return;
+      }
+
+      try {
+        setIsLoading(true);
+        setError("");
+        const response = await fetchUserCourses(user.userId);
+        setCourses(response.courses);
+      } catch (err) {
+        setError(err.message || "Unable to load courses");
+      } finally {
+        setIsLoading(false);
+      }
     }
+
+    loadCourses();
+  }, [user?.userId]);
+
+  const refreshCourses = async () => {
+    const response = await fetchUserCourses(user.userId);
+    setCourses(response.courses);
+  };
+
+  const handleSaveCourse = async (form) => {
+    try {
+      setIsSaving(true);
+      setError("");
+
+      if (selectedCourse) {
+        await updateUserCourse(user.userId, selectedCourse.id, form);
+        setSuccessMessage(`${form.code.toUpperCase()} was updated.`);
+      } else {
+        await createUserCourse(user.userId, form);
+        setSuccessMessage(`${form.code.toUpperCase()} was added to your courses.`);
+      }
+
+      await refreshCourses();
+      setSelectedCourse(null);
+      setShowCourseModal(false);
+    } catch (err) {
+      setError(err.message || "Unable to save course");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleDeleteCourse = async (course) => {
+    if (!window.confirm(`Delete ${course.code} - ${course.name}?`)) {
+      return;
+    }
+
+    try {
+      setError("");
+      await deleteUserCourse(user.userId, course.id);
+      await refreshCourses();
+      setSuccessMessage(`${course.code} was removed from your courses.`);
+    } catch (err) {
+      setError(err.message || "Unable to delete course");
+    }
+  };
+
+  if (!user) {
+    return <div className="card">Please log in to manage courses.</div>;
   }
 
   return (
-    <div>
-      {/* Header */}
-      <div className="mb-8 flex justify-between items-center">
+    <div className="student-page">
+      <div className="page-header">
         <div>
-          <h1 className="text-4xl font-bold text-gray-900">My Courses</h1>
-          <p className="text-gray-600 mt-2">You are enrolled in {mockStudentCourses.length} courses</p>
+          <p className="eyebrow">Course Management</p>
+          <h1 className="page-title">My Courses</h1>
+          <p className="page-subtitle">Search, add, edit, and remove the courses saved on your account.</p>
         </div>
         <button
-          onClick={() => setShowAddModal(true)}
+          onClick={() => {
+            setSelectedCourse(null);
+            setShowCourseModal(true);
+          }}
           className="btn-primary"
         >
-          + Add Course
+          Add Course
         </button>
       </div>
 
-      {/* Search Bar */}
-      <div className="mb-8">
+      {successMessage ? <div className="alert-box success-alert">{successMessage}</div> : null}
+      {error ? <div className="alert-box error-alert">{error}</div> : null}
+
+      <div className="card">
+        <div className="section-heading">
+          <div>
+            <h2>Search Courses</h2>
+            <p>You are enrolled in {courses.length} courses.</p>
+          </div>
+        </div>
         <input
           type="text"
-          placeholder="Search courses by code or name..."
+          placeholder="Search by code, name, or instructor..."
           value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="input-field w-full"
+          onChange={(event) => setSearchTerm(event.target.value)}
+          className="input-field"
         />
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-  {filteredCourses.map((course) => (
-    <CourseCard
-      key={course.id}
-      course={course}
-      onClick={() => navigate(`/courses/${course.id}`)}
-    />
-  ))}
-</div>
-
-      {filteredCourses.length === 0 && (
-        <div className="text-center py-12">
-          <p className="text-gray-500 text-lg mb-4">No courses found matching "{searchTerm}"</p>
-          <button
-            onClick={() => setSearchTerm('')}
-            className="btn-secondary"
-          >
+      {isLoading ? (
+        <div className="card">Loading courses...</div>
+      ) : filteredCourses.length === 0 ? (
+        <div className="card empty-state">
+          <p>No courses found for "{searchTerm}".</p>
+          <button onClick={() => setSearchTerm("")} className="btn-secondary">
             Clear Search
           </button>
         </div>
+      ) : (
+        <div className="course-grid">
+          {filteredCourses.map((course) => (
+            <CourseCard
+              key={course.id}
+              course={course}
+              onClick={() => navigate(`/courses/${course.id}`)}
+              onEdit={() => {
+                setSelectedCourse(course);
+                setShowCourseModal(true);
+              }}
+              onDelete={() => handleDeleteCourse(course)}
+            />
+          ))}
+        </div>
       )}
 
-      {/* Add Course Modal */}
-      <Modal
-        isOpen={showAddModal}
-        onClose={() => setShowAddModal(false)}
-        title="Add a New Course"
-        size="md"
-      >
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Course Code *
-            </label>
-            <input
-              type="text"
-              placeholder="e.g., SOEN287"
-              value={newCourse.code}
-              onChange={(e) => setNewCourse({ ...newCourse, code: e.target.value })}
-              className="input-field"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Course Name *
-            </label>
-            <input
-              type="text"
-              placeholder="e.g., Web Programming"
-              value={newCourse.name}
-              onChange={(e) => setNewCourse({ ...newCourse, name: e.target.value })}
-              className="input-field"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Instructor
-            </label>
-            <input
-              type="text"
-              placeholder="e.g., Dr. Margaret Kwan"
-              value={newCourse.instructor}
-              onChange={(e) => setNewCourse({ ...newCourse, instructor: e.target.value })}
-              className="input-field"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Term
-            </label>
-            <input
-              type="text"
-              placeholder="e.g., Winter 2026"
-              value={newCourse.term}
-              onChange={(e) => setNewCourse({ ...newCourse, term: e.target.value })}
-              className="input-field"
-            />
-          </div>
-          <div className="flex gap-3 pt-4">
-            <button
-              onClick={handleAddCourse}
-              className="btn-primary flex-1"
-            >
-              Add Course
-            </button>
-            <button
-              onClick={() => setShowAddModal(false)}
-              className="btn-secondary flex-1"
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
-      </Modal>
+      <CourseFormModal
+        isOpen={showCourseModal}
+        onClose={() => {
+          setShowCourseModal(false);
+          setSelectedCourse(null);
+          setError("");
+        }}
+        onSubmit={handleSaveCourse}
+        initialValues={
+          selectedCourse || {
+            code: "",
+            name: "",
+            instructor: "",
+            term: "",
+          }
+        }
+        title={selectedCourse ? "Edit Course" : "Add Course"}
+        submitLabel={selectedCourse ? "Save Changes" : "Create Course"}
+        isSubmitting={isSaving}
+        error={error}
+      />
     </div>
-  )
+  );
 }
 
-export default CoursesPage
+export default CoursesPage;

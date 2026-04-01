@@ -8,6 +8,9 @@ function GradeTable({ assessments }) {
 
   return (
     <div className="overflow-x-auto">
+      {assessments.length === 0 ? (
+        <p className="empty-copy">No assessments stored for this course yet.</p>
+      ) : null}
       <table className="w-full">
         <thead>
           <tr className="border-b-2 border-gray-300 bg-gray-50">

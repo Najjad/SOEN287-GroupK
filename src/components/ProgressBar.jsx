@@ -1,33 +1,32 @@
-function ProgressBar({ percentage, label, size = 'md' }) {
-  const sizeClasses = {
-    sm: 'h-2',
-    md: 'h-3',
-    lg: 'h-4'
-  }
+import { getProgressTone } from "../utils/courseHelpers";
 
-  const getColor = (pct) => {
-    if (pct >= 90) return 'bg-green-600'
-    if (pct >= 80) return 'bg-blue-600'
-    if (pct >= 70) return 'bg-amber-600'
-    return 'bg-red-600'
-  }
+function ProgressBar({ percentage, label, size = "md" }) {
+  const heights = {
+    sm: 8,
+    md: 12,
+    lg: 16,
+  };
 
   return (
-    <div>
-      {label && (
-        <div className="flex justify-between mb-2">
-          <span className="text-sm font-medium text-gray-700">{label}</span>
-          <span className="text-sm font-bold text-gray-900">{percentage.toFixed(1)}%</span>
+    <div className="progress-wrapper">
+      {label ? (
+        <div className="progress-label-row">
+          <span>{label}</span>
+          <span>{percentage.toFixed(1)}%</span>
         </div>
-      )}
-      <div className="w-full bg-gray-200 rounded-full overflow-hidden">
+      ) : null}
+      <div className="progress-track" style={{ height: heights[size] }}>
         <div
-          className={`${getColor(percentage)} ${sizeClasses[size]} rounded-full transition-all duration-300`}
-          style={{ width: `${percentage}%` }}
-        ></div>
+          className="progress-bar-fill"
+          style={{
+            width: `${percentage}%`,
+            height: heights[size],
+            background: getProgressTone(percentage),
+          }}
+        />
       </div>
     </div>
-  )
+  );
 }
 
-export default ProgressBar
+export default ProgressBar;

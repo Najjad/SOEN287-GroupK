@@ -11,6 +11,7 @@ function Register() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async (e) => {
 
@@ -25,25 +26,25 @@ function Register() {
 
     try {
 
-      const success =
+      setIsSubmitting(true);
+
+      const createdUser =
         await register({
           role,
           email,
           password
         });
 
-      if (!success) {
-        setError("Registration failed");
-        return;
-      }
-
-      navigate("/dashboard");
+      navigate(createdUser.role === "admin" ? "/admin" : "/dashboard");
 
     } catch (err) {
 
       console.error(err);
 
-      setError("Server error");
+      setError(err.message || "Server error");
+
+    } finally {
+      setIsSubmitting(false);
 
     }
 
@@ -94,8 +95,8 @@ function Register() {
           </p>
         )}
 
-        <button type="submit">
-          Register
+        <button type="submit" disabled={isSubmitting}>
+          {isSubmitting ? "Creating Account..." : "Register"}
         </button>
 
       </form>
