@@ -70,7 +70,40 @@ Then install the project dependencies:
 npm install
 ```
 
-### 3. Run the project
+Install backend dependencies too:
+```bash
+cd backend
+npm install
+cd ..
+```
+
+### 3. Create the backend environment file
+Inside the `backend` folder, create a file named `.env`.
+
+You can copy the example file:
+```bash
+cp backend/.env.example backend/.env
+```
+
+The file should contain:
+```env
+MONGO_URI=mongodb+srv://SCC:MmyImjE1jgo9QjUm@yetivault.gwjaghj.mongodb.net/?appName=yetivault
+PORT=5000
+```
+
+### 4. Run the backend
+Open a terminal and run:
+```bash
+cd backend
+node server.js
+```
+
+You should see:
+- `MongoDB connected`
+- `Server running on http://127.0.0.1:5000`
+
+### 5. Run the frontend
+Open another terminal and run:
 ```bash
 npm start
 ```
