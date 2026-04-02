@@ -1,7 +1,10 @@
-# Smart Course Companion
-SOEN 287 - Web Programming
-Winter 2026
+# Getting Started with Create React App
 
+This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+
+# Smart Course Companion  
+SOEN 287 – Web Programming  
+Winter 2026  
 ## Overview
 
 Smart Course Companion is a web-based application that helps university students manage:
@@ -93,7 +96,8 @@ PORT=5000
 ### 4. Run the backend
 Open a terminal and run:
 ```bash
-npm run server
+cd backend
+node server.js
 ```
 
 You should see:
@@ -117,3 +121,4 @@ Use:
 - The backend lives in `backend/server.js`
 - API routes live in `backend/routes/users.js`
 - Every teammate should use the same `backend/.env` values before testing PRs
+
