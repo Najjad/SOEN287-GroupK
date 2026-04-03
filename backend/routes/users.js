@@ -222,6 +222,13 @@ router.post("/register", async (req, res) => {
 
     const result = await db.collection("users").insertOne(newUser);
 
+    res.cookie("userEmail", email, {
+      httpOnly: true,
+      secure: false, // true if using HTTPS
+      sameSite: "lax",
+      maxAge: 1000 * 60 * 60 * 24 // 1 day
+    });
+
     res.status(201).json({
       message: "User created",
       userId: result.insertedId,
@@ -285,6 +292,71 @@ router.get("/getByEmail/:email", async (req, res) => {
     console.error(err);
     res.status(500).json({ error: "Server error" });
   }
+});
+
+
+router.put("/updateByEmail/:email", async (req, res) => {
+
+  try {
+
+    const db = req.app.locals.db;
+
+    const originalEmail =
+      req.params.email;
+
+    if (!originalEmail) {
+      return res.status(400).json({
+        error: "Email is required"
+      });
+    }
+
+    const updatedData =
+      req.body;
+
+    delete updatedData.password;
+
+    const result =
+      await db.collection("users")
+        .updateOne(
+          { email: originalEmail },
+          { $set: updatedData }
+        );
+
+    if (result.matchedCount === 0) {
+      return res.status(404).json({
+        error: "User not found"
+      });
+    }
+
+    // If email changed, use new email
+    const newEmail =
+      updatedData.email || originalEmail;
+
+    const updatedUser =
+      await db.collection("users")
+        .findOne({ email: newEmail });
+
+    if (!updatedUser) {
+      return res.status(404).json({
+        error: "Updated user not found"
+      });
+    }
+
+    const { password, ...safeUser } =
+      updatedUser;
+
+    res.json(safeUser);
+
+  } catch (err) {
+
+    console.error(err);
+
+    res.status(500).json({
+      error: "Server error"
+    });
+
+  }
+
 });
 
 router.get("/:userId/dashboard", async (req, res) => {

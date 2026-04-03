@@ -60,3 +60,23 @@ export function deleteUserCourse(userId, courseId) {
     method: "DELETE",
   });
 }
+
+export function updateUserByEmail(email, updatedData) {
+
+  return request(
+    `/updateByEmail/${encodeURIComponent(email)}`,
+    {
+      method: "PUT",
+      body: JSON.stringify(updatedData)
+    }
+  );
+
+}
+
+export function fetchUserById(userId) {
+
+  return request(
+    `/${encodeURIComponent(userId)}`
+  );
+
+}
