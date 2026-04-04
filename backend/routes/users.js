@@ -236,8 +236,8 @@ router.post("/register", async (req, res) => {
       role: newUser.role,
     });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Server error" });
+  console.error("REGISTER ERROR:", err);
+  res.status(500).json({ error: err.message });
   }
 });
 
@@ -267,8 +267,8 @@ router.post("/login", async (req, res) => {
       role: user.role,
     });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Server error" });
+  console.error("LOGIN ERROR:", err);
+  res.status(500).json({ error: err.message });
   }
 });
 
@@ -289,8 +289,8 @@ router.get("/getByEmail/:email", async (req, res) => {
     const { password, ...userData } = user;
     res.json(userData);
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Server error" });
+  console.error("GET EMAIL ERROR:", err);
+  res.status(500).json({ error: err.message });
   }
 });
 
@@ -600,6 +600,76 @@ router.delete("/:id", async (req, res) => {
     if (result.deletedCount === 0) return res.status(404).json({ error: "User not found" });
 
     res.json({ message: "Account deleted successfully" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+router.post("/:userId/courses/:courseId/assessments", async (req, res) => {
+  try {
+    const db = req.app.locals.db;
+    const user = await findUserById(db, req.params.userId);
+
+    if (!user) return res.status(404).json({ error: "User not found" });
+
+    const course = user.courses.find(c => c.id === req.params.courseId);
+    if (!course) return res.status(404).json({ error: "Course not found" });
+
+    const { title, category, weight, dueDate, totalMarks } = req.body;
+
+    const newAssessment = {
+      id: new ObjectId().toString(),
+      title,
+      category,
+      weight,
+      dueDate,
+      totalMarks,
+      earnedMarks: null,
+      status: "pending"
+    };
+
+    course.assessments.push(newAssessment);
+
+    await db.collection("users").updateOne(
+      { _id: user._id },
+      { $set: { courses: user.courses } }
+    );
+
+    res.json(newAssessment);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+router.put("/:userId/courses/:courseId/assessments/:assessmentId", async (req, res) => {
+  try {
+    const db = req.app.locals.db;
+    const user = await findUserById(db, req.params.userId);
+
+    if (!user) return res.status(404).json({ error: "User not found" });
+
+    const course = user.courses.find(c => c.id === req.params.courseId);
+    if (!course) return res.status(404).json({ error: "Course not found" });
+
+    const assessment = course.assessments.find(a => a.id === req.params.assessmentId);
+    if (!assessment) return res.status(404).json({ error: "Assessment not found" });
+
+    const { earnedMarks, status } = req.body;
+
+    if (earnedMarks !== undefined) {
+      assessment.earnedMarks = Number(earnedMarks);
+    }
+
+    if (status) {
+      assessment.status = status;
+    }
+
+    await db.collection("users").updateOne(
+      { _id: user._id },
+      { $set: { courses: user.courses } }
+    );
+
+    res.json(assessment);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Server error" });
