@@ -12,14 +12,14 @@ function Login() {
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // FIXED: async login handling
+ 
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // Clear old error
+  
     setError("");
 
-    // Validation
+
     if (!email || !password) {
       setError("All fields are required");
       return;
@@ -27,11 +27,11 @@ function Login() {
 
     try {
 
-      // Call backend login
+
       setIsSubmitting(true);
       const loggedInUser = await login(email, password);
 
-      // Redirect on success
+  
       navigate(loggedInUser.role === "admin" ? "/admin" : "/dashboard");
 
     } catch (err) {
@@ -71,10 +71,6 @@ function Login() {
           {isSubmitting ? "Signing In..." : "Login"}
         </button>
       </form>
-
-      <p>Test accounts:</p>
-      <p>student@test.com / 1234</p>
-      <p>admin@test.com / 1234</p>
     </div>
   );
 }
