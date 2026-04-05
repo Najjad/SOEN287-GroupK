@@ -297,6 +297,178 @@ function buildDashboard(user) {
   };
 }
 
+function buildUsageStats(users, templates) {
+  const normalizedUsers = users || [];
+  const normalizedTemplates = templates || [];
+  const studentUsers = normalizedUsers.filter((user) => user.role !== "admin");
+  const adminUsers = normalizedUsers.filter((user) => user.role === "admin");
+
+  const allCourses = studentUsers.flatMap((user) =>
+    (user.courses || []).map((course) => ({
+      ...summarizeCourse(course),
+      ownerId: String(user._id),
+      ownerEmail: user.email,
+    }))
+  );
+
+  const allAssessments = allCourses.flatMap((course) => course.assessments || []);
+  const templateCourses = allCourses.filter((course) => course.templateId || course.templateName);
+  const completedAssessments = allAssessments.filter((assessment) => assessment.status === "completed");
+  const urgentAssessments = allAssessments.filter((assessment) => assessment.status === "urgent");
+  const overdueAssessments = allAssessments.filter((assessment) => assessment.status === "overdue");
+  const pendingAssessments = allAssessments.filter((assessment) => assessment.status === "pending");
+
+  const averageCourseProgress = allCourses.length
+    ? allCourses.reduce((sum, course) => sum + Number(course.progress || 0), 0) / allCourses.length
+    : 0;
+
+  const averageCourseAverage = allCourses.length
+    ? allCourses.reduce((sum, course) => sum + Number(course.average || 0), 0) / allCourses.length
+    : 0;
+
+  const adoptionRate = allCourses.length
+    ? (templateCourses.length / allCourses.length) * 100
+    : 0;
+
+  const courseRollups = new Map();
+
+  for (const course of allCourses) {
+    const existing = courseRollups.get(course.code) || {
+      code: course.code,
+      name: course.name,
+      studentsEnrolled: 0,
+      totalAverage: 0,
+      totalProgress: 0,
+      completedAssessments: 0,
+      pendingAssessments: 0,
+      templateCount: 0,
+      manualCount: 0,
+    };
+
+    existing.studentsEnrolled += 1;
+    existing.totalAverage += Number(course.average || 0);
+    existing.totalProgress += Number(course.progress || 0);
+    existing.completedAssessments += Number(course.completedAssessments || 0);
+    existing.pendingAssessments += Number(course.pendingAssessments || 0);
+
+    if (course.templateId || course.templateName) {
+      existing.templateCount += 1;
+    } else {
+      existing.manualCount += 1;
+    }
+
+    courseRollups.set(course.code, existing);
+  }
+
+  const courseBreakdown = Array.from(courseRollups.values())
+    .map((course) => ({
+      ...course,
+      averageGrade: Number((course.totalAverage / course.studentsEnrolled).toFixed(1)),
+      averageProgress: Number((course.totalProgress / course.studentsEnrolled).toFixed(1)),
+    }))
+    .sort((left, right) => right.studentsEnrolled - left.studentsEnrolled || right.averageProgress - left.averageProgress);
+
+  const templateUsageCounts = new Map(
+    normalizedTemplates.map((template) => [template.name, {
+      id: String(template._id),
+      name: template.name,
+      description: template.description || "",
+      categoryCount: (template.categories || []).length,
+      coursesCreated: 0,
+    }])
+  );
+
+  for (const course of templateCourses) {
+    const key = course.templateName || "Unknown Template";
+    const existing = templateUsageCounts.get(key) || {
+      id: key,
+      name: key,
+      description: "",
+      categoryCount: 0,
+      coursesCreated: 0,
+    };
+
+    existing.coursesCreated += 1;
+    templateUsageCounts.set(key, existing);
+  }
+
+  const templateAdoption = Array.from(templateUsageCounts.values())
+    .map((template) => ({
+      ...template,
+      shareOfTemplateCourses: templateCourses.length
+        ? Number(((template.coursesCreated / templateCourses.length) * 100).toFixed(1))
+        : 0,
+    }))
+    .sort((left, right) => right.coursesCreated - left.coursesCreated || left.name.localeCompare(right.name));
+
+  const studentEngagement = [
+    {
+      label: "No Courses Yet",
+      value: studentUsers.filter((user) => (user.courses || []).length === 0).length,
+      helper: "Students who signed up but have not added a course.",
+    },
+    {
+      label: "1-2 Courses",
+      value: studentUsers.filter((user) => {
+        const count = (user.courses || []).length;
+        return count >= 1 && count <= 2;
+      }).length,
+      helper: "Students getting started with a lighter workload.",
+    },
+    {
+      label: "3+ Courses",
+      value: studentUsers.filter((user) => (user.courses || []).length >= 3).length,
+      helper: "Students actively using the planner across multiple classes.",
+    },
+  ];
+
+  const assessmentStatus = [
+    {
+      label: "Completed",
+      value: completedAssessments.length,
+      color: "#16a34a",
+    },
+    {
+      label: "Pending",
+      value: pendingAssessments.length,
+      color: "#2563eb",
+    },
+    {
+      label: "Urgent",
+      value: urgentAssessments.length,
+      color: "#d97706",
+    },
+    {
+      label: "Overdue",
+      value: overdueAssessments.length,
+      color: "#dc2626",
+    },
+  ];
+
+  return {
+    generatedAt: new Date().toISOString(),
+    overview: {
+      totalUsers: normalizedUsers.length,
+      studentCount: studentUsers.length,
+      adminCount: adminUsers.length,
+      totalCourses: allCourses.length,
+      templateCount: normalizedTemplates.length,
+      templateBasedCourses: templateCourses.length,
+      adoptionRate: Number(adoptionRate.toFixed(1)),
+      averageCourseProgress: Number(averageCourseProgress.toFixed(1)),
+      averageCourseAverage: Number(averageCourseAverage.toFixed(1)),
+      completedAssessments: completedAssessments.length,
+      pendingAssessments: pendingAssessments.length,
+      urgentAssessments: urgentAssessments.length,
+      overdueAssessments: overdueAssessments.length,
+    },
+    assessmentStatus,
+    courseBreakdown: courseBreakdown.slice(0, 8),
+    templateAdoption,
+    studentEngagement,
+  };
+}
+
 async function findUserById(db, userId) {
   const objectId = parseUserId(userId);
   if (!objectId) {
@@ -793,6 +965,21 @@ router.get("/templates", async (req, res) => {
   }
 });
 
+router.get("/admin/usage-stats", async (req, res) => {
+  try {
+    const db = req.app.locals.db;
+    const [users, templates] = await Promise.all([
+      db.collection("users").find({}).toArray(),
+      db.collection("courseTemplates").find({}).toArray(),
+    ]);
+
+    res.json(buildUsageStats(users, templates));
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
 router.post("/templates", async (req, res) => {
   try {
     const db = req.app.locals.db;
@@ -870,13 +1057,13 @@ router.post("/:userId/courses/from-template/:templateId", async (req, res) => {
       return res.status(409).json({ error: "You already added that course code" });
     }
 
-    const newCourse = {
+   const newCourse = {
   id: new ObjectId().toString(),
   code,
   name,
   instructor,
   term,
-  enabled:true,
+  enabled: true,
   categories: template.categories,
   description:
     template.description ||

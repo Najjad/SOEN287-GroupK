@@ -753,8 +753,114 @@ body {
   margin-bottom: 1rem;
 }
 
+.usage-page .summary-card {
+  min-height: 168px;
+}
+
+.usage-generated-tag {
+  align-self: center;
+  padding: 0.8rem 1rem;
+  border-radius: 999px;
+  background: rgba(79, 70, 229, 0.12);
+  color: var(--primary);
+  font-weight: 700;
+  text-align: center;
+}
+
+.usage-highlight-grid,
+.usage-chart-grid {
+  display: grid;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.usage-highlight-grid {
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
+.usage-chart-grid {
+  grid-template-columns: 1.6fr 1fr;
+}
+
+.usage-highlight-card {
+  border-left-width: 0;
+  background:
+    radial-gradient(circle at top right, rgba(6, 182, 212, 0.15), transparent 42%),
+    linear-gradient(180deg, #ffffff, #f8fbff);
+}
+
+.usage-chart-card {
+  min-height: 420px;
+}
+
+.chart-shell {
+  position: relative;
+  height: 320px;
+}
+
+.doughnut-shell {
+  height: 300px;
+}
+
+.usage-detail-grid {
+  align-items: start;
+}
+
+.usage-list,
+.usage-table {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.usage-list-row,
+.usage-table-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: center;
+  padding: 1rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  background: #fff;
+}
+
+.usage-metric-pair,
+.usage-inline-metrics {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+}
+
+.usage-metric-pair {
+  flex-direction: column;
+  align-items: flex-end;
+  min-width: 120px;
+}
+
+.usage-metric-pair strong,
+.usage-inline-metrics strong {
+  font-size: 1.1rem;
+}
+
+.usage-metric-pair span {
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  text-align: right;
+}
+
+.usage-inline-metrics > div {
+  min-width: 96px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
 @media (max-width: 960px) {
   .dashboard-two-column {
+    grid-template-columns: 1fr;
+  }
+
+  .usage-chart-grid {
     grid-template-columns: 1fr;
   }
 }
@@ -780,7 +886,10 @@ body {
   .card-action-row,
   .course-card-header,
   .course-stats,
-  .mini-metrics {
+  .mini-metrics,
+  .usage-list-row,
+  .usage-table-row,
+  .usage-inline-metrics {
     flex-direction: column;
   }
 
@@ -788,6 +897,11 @@ body {
   .template-summary-row,
   .category-builder-row {
     grid-template-columns: 1fr;
+  }
+
+  .usage-metric-pair {
+    align-items: flex-start;
+    text-align: left;
   }
 }
 

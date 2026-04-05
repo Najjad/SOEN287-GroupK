@@ -65,6 +65,10 @@ export function fetchCourseTemplates() {
   return request("/templates");
 }
 
+export function fetchUsageStats() {
+  return request("/admin/usage-stats");
+}
+
 export function createCourseTemplate(payload) {
   return request("/templates", {
     method: "POST",
