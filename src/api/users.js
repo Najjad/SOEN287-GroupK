@@ -129,3 +129,8 @@ export function deleteAssessment(userId, courseId, assessmentId) {
     method: "DELETE",
   });
 }
+export function deleteCourseTemplate(templateId) {
+  return request(`/templates/${encodeURIComponent(templateId)}`, {
+    method: "DELETE",
+  });
+}
