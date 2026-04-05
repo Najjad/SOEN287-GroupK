@@ -25,10 +25,51 @@
   --transition: all 0.25s ease;
 }
 
+/* ---------- DARK MODE ---------- */
+
+body.dark {
+
+  --bg-gradient:
+    linear-gradient(135deg, #020617, #0f172a, #1e293b);
+
+  --bg-soft: #020617;
+
+  --surface:
+    rgba(15, 23, 42, 0.85);
+
+  --surface-solid: #0f172a;
+
+  --primary: #6366f1;
+  --primary-hover: #4f46e5;
+
+  --accent: #22d3ee;
+  --success: #22c55e;
+  --danger: #ef4444;
+
+  --text-dark: #e5e7eb;
+  --text-light: #ffffff;
+
+  --text-muted: #94a3b8;
+
+  --shadow-sm:
+    0 4px 12px rgba(0, 0, 0, 0.4);
+
+  --shadow-md:
+    0 8px 24px rgba(0, 0, 0, 0.5);
+
+  --shadow-lg:
+    0 16px 40px rgba(0, 0, 0, 0.6);
+}
+
 /* ---------- Base Reset ---------- */
 
 * {
   box-sizing: border-box;
+}
+
+.card, .course-card, .summary-card, .template-card, .template-preview-card {
+  background: #ffffff;
+  color: #0f172a;   /* force dark text */
 }
 
 body {

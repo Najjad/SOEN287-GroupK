@@ -14,9 +14,13 @@ import UsageStats from "./pages/UsageStats";
 import CoursesPage from "./pages/CoursesPage";
 import CourseDetailPage from "./pages/CourseDetailPage";
 import Account from "./pages/Account";
+import { ThemeProvider } from "./context/ThemeContext";
 
 function App() {
   return (
+
+<ThemeProvider>
+
     <AuthProvider>
       <BrowserRouter>
         <Routes>
@@ -30,11 +34,7 @@ function App() {
             <Route path="/admin/stats" element={<UsageStats />} />
             <Route path="/assessments/:courseId" element={<AssessmentsPage />} /> 
             <Route path="/assessments" element={<AssessmentsSelectorPage />} />
-
-<Route
-  path="/assessments/:courseId"
-  element={<AssessmentsPage />}
-/>
+            <Route path="/assessments/:courseId" element={<AssessmentsPage />}/>
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/courses" element={<CoursesPage />} />
             <Route path="/courses/:courseId" element={<CourseDetailPage />} />
@@ -43,6 +43,7 @@ function App() {
         </Routes>
       </BrowserRouter>
     </AuthProvider>
+    </ThemeProvider>
   );
 }
 

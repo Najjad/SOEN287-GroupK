@@ -2,6 +2,8 @@ import { useContext } from "react";
 import { AuthContext } from "../context/AuthContext";
 import { Link, useNavigate } from "react-router-dom";
 
+import { ThemeContext } from "../context/ThemeContext";
+
 export default function Navbar() {
   const { user, logout } = useContext(AuthContext);
   const navigate = useNavigate();
@@ -10,6 +12,9 @@ export default function Navbar() {
     logout();
     navigate("/");
   };
+
+  const { theme, toggleTheme } =
+  useContext(ThemeContext);
 
   return (
     <nav className="navbar" style={navStyle}>
@@ -41,6 +46,16 @@ export default function Navbar() {
             <button onClick={handleLogout} style={buttonStyle}>
               Logout
             </button>
+
+                
+            <button
+            onClick={toggleTheme}
+            style={buttonStyle}
+          >
+            {theme === "dark"
+              ? "Light Mode"
+              : "Dark Mode"}
+          </button>
           </>
         )}
       </div>
@@ -54,7 +69,7 @@ const navStyle = {
   justifyContent: "space-between",
   alignItems: "center",
   padding: "0.75rem 2rem",
-  background: "linear-gradient(90deg, #4f46e5, #3b82f6)",
+  background: "var(--bg-gradient)",
   color: "white",
   boxShadow: "0 3px 8px rgba(0,0,0,0.15)",
   position: "sticky",
@@ -88,4 +103,3 @@ const roleBadgeStyle = {
   fontWeight: 600,
   fontSize: 12,
 };
-
