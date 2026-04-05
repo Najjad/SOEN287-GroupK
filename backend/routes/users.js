@@ -863,21 +863,23 @@ router.post("/:userId/courses/from-template/:templateId", async (req, res) => {
     }
 
     const newCourse = {
-      id: new ObjectId().toString(),
-      code,
-      name,
-      instructor,
-      term,
-      description:
-        template.description ||
-        `${name} was added from the ${template.name} template. Use this page to track progress and assessments.`,
-      room: "TBA",
-      schedule: "TBA",
-      credit: 3,
-      templateId: String(template._id),
-      templateName: template.name,
-      assessments: buildAssessmentsFromTemplate(template, code, name),
-    };
+  id: new ObjectId().toString(),
+  code,
+  name,
+  instructor,
+  term,
+  categories: template.categories,
+  description:
+    template.description ||
+    `${name} was added from the ${template.name} template. Use this page to track progress and assessments.`,
+  room: "TBA",
+  schedule: "TBA",
+  credit: 3,
+  templateId: String(template._id),
+  templateName: template.name,
+  assessments: buildAssessmentsFromTemplate(template, code, name),
+};
+
 
     await db.collection("users").updateOne(
       { _id: objectId },
