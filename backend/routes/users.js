@@ -1016,6 +1016,28 @@ router.post("/templates", async (req, res) => {
     res.status(500).json({ error: "Server error" });
   }
 });
+router.delete("/templates/:templateId", async (req, res) => {
+  try {
+    const db = req.app.locals.db;
+
+    if (!ObjectId.isValid(req.params.templateId)) {
+      return res.status(400).json({ error: "Invalid template id" });
+    }
+
+    const result = await db.collection("courseTemplates").deleteOne({
+      _id: new ObjectId(req.params.templateId),
+    });
+
+    if (result.deletedCount === 0) {
+      return res.status(404).json({ error: "Template not found" });
+    }
+
+    res.json({ message: "Template deleted successfully" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
 
 router.post("/:userId/courses/from-template/:templateId", async (req, res) => {
   try {

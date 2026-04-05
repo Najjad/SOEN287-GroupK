@@ -2,6 +2,7 @@ import { useContext, useEffect, useMemo, useState } from "react";
 import { AuthContext } from "../context/AuthContext";
 import CategoryBuilder from "../components/CategoryBuilder";
 import { createCourseTemplate, fetchCourseTemplates } from "../api/users";
+import { deleteCourseTemplate } from "../api/users";
 
 function Templates() {
   const { user } = useContext(AuthContext);
@@ -35,7 +36,19 @@ function Templates() {
 
     loadTemplates();
   }, []);
+  const handleDeleteTemplate = async (templateId) => {
+  if (!window.confirm("Delete this template?")) return;
 
+  try {
+    await deleteCourseTemplate(templateId);
+
+    setTemplates((prev) =>
+      prev.filter((template) => template.id !== templateId)
+    );
+  } catch (err) {
+    setError(err.message || "Failed to delete template");
+  }
+};
   const handleSaveTemplate = async () => {
     if (!templateName.trim()) {
       setError("Template name is required");
@@ -154,13 +167,27 @@ function Templates() {
             <div className="template-list">
               {templates.map((template) => (
                 <article key={template.id} className="template-card">
-                  <div className="template-card-header">
-                    <div>
-                      <h3>{template.name}</h3>
-                      {template.description ? <p>{template.description}</p> : null}
-                    </div>
-                    <span className="status-chip pending">{template.categories?.length || 0} categories</span>
+                  <div>
+                 <div className="template-card-header">
+                  <h3>{template.name}</h3>
+                  {template.description ?<p>{template.description}</p> : null}
                   </div>
+                  <div>
+                    <span className="Status-chip pending">
+                      {template.categories?.length||0} categories
+                    </span>
+                   <button 
+                   className="btn-secondary"
+                   onClick={()=>handleDeleteTemplate(template.id)}
+                   style={{marginleft:"10px"}}
+                   >delete
+                   </button>
+                  </div>
+
+
+
+                  
+                 </div>
 
                   <div className="template-category-list">
                     {(template.categories || []).map((category) => (
