@@ -683,13 +683,17 @@ router.post("/:userId/courses", async (req, res) => {
       return res.status(400).json({ error: validation.error });
     }
 
-    const categoriesValidation = parseAndValidateCategories(req.body.categories);
-    if (categoriesValidation.error) {
-      return res.status(400).json({ error: categoriesValidation.error });
-    }
-
     const { code, name, instructor, term } = validation.value;
-    const categories = categoriesValidation.value;
+
+let categories = [];
+if (Array.isArray(req.body.categories) && req.body.categories.length > 0) {
+  const categoriesValidation = parseAndValidateCategories(req.body.categories);
+  if (categoriesValidation.error) {
+    return res.status(400).json({ error: categoriesValidation.error });
+  }
+  categories = categoriesValidation.value;
+}
+
 
     const existingUser = await db.collection("users").findOne({ _id: objectId });
     if (!existingUser) {
